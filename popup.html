@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>9Anime Continuous Player</title>
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 15px 0;
+      font-weight: 600;
+    }
+
+    .status {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      backdrop-filter: blur(10px);
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status-indicator.active {
+      background: #4ade80;
+      box-shadow: 0 0 10px #4ade80;
+    }
+
+    .status-indicator.inactive {
+      background: #ef4444;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: white;
+      color: #764ba2;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 10px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .info {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 15px;
+      line-height: 1.6;
+    }
+
+    .settings {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 15px;
+      font-size: 13px;
+    }
+
+    .settings label {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .settings input[type="checkbox"] {
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎬 9Anime Continuous Player</h1>
+
+  <div class="status">
+    <span class="status-indicator active" id="statusIndicator"></span>
+    <span id="statusText">Extension Active</span>
+  </div>
+
+  <button id="toggleBtn">Disable Auto-Play</button>
+  <button id="openAnime">Open 9Anime</button>
+
+  <div class="settings">
+    <label>
+      <input type="checkbox" id="fullscreenCheck" checked>
+      Auto-fullscreen
+    </label>
+    <label>
+      <input type="checkbox" id="transitionCheck" checked>
+      Show transitions
+    </label>
+  </div>
+
+  <div class="info">
+    📺 Automatically plays anime episodes continuously with smooth transitions between episodes and series.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

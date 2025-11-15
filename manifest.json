@@ -1,0 +1,43 @@
+{
+  "manifest_version": 2,
+  "name": "9Anime Continuous Player",
+  "version": "1.0.0",
+  "description": "Automatically plays anime episodes continuously from 9anime with genre-based transitions",
+
+  "permissions": [
+    "storage",
+    "tabs",
+    "*://9animetv.to/*",
+    "*://*.9animetv.to/*"
+  ],
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://9animetv.to/watch/*", "*://*.9animetv.to/watch/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon.png"
+    }
+  },
+
+  "icons": {
+    "48": "icon.png"
+  },
+
+  "web_accessible_resources": [
+    "overlay.js",
+    "styles.css"
+  ]
+}
