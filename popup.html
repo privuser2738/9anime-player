@@ -118,6 +118,18 @@
     📺 Automatically plays anime episodes continuously with smooth transitions between episodes and series.
   </div>
 
+  <div class="settings" id="logSection" style="margin-top: 15px;">
+    <h2 style="font-size: 14px; margin: 0 0 10px 0;">📝 Verbose Logging</h2>
+    <label style="margin-bottom: 12px;">
+      <input type="checkbox" id="enableLogging" checked>
+      Enable verbose logging
+    </label>
+    <div id="logStats" style="font-size: 11px; opacity: 0.8; margin: 10px 0; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;"></div>
+    <button id="exportText" style="font-size: 12px; padding: 8px; margin-bottom: 5px;">Export Logs (Text)</button>
+    <button id="exportJSON" style="font-size: 12px; padding: 8px; margin-bottom: 5px;">Export Logs (JSON)</button>
+    <button id="clearLogs" style="font-size: 12px; padding: 8px; background: #ef4444; color: white;">Clear All Logs</button>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>

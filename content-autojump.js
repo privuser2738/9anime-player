@@ -1,5 +1,10 @@
 // 9Anime Playlist Player - With Auto-Jump & Random Episodes Feature
-console.log('[9Anime Playlist] Loading with Auto-Jump...');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('[9Anime Playlist] 🚀 EXTENSION LOADING...');
+console.log('[9Anime Playlist] 📍 Location:', window.location.href);
+console.log('[9Anime Playlist] 🌐 Hostname:', window.location.hostname);
+console.log('[9Anime Playlist] 📄 Pathname:', window.location.pathname);
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
 class PlaylistPlayer {
   constructor() {
@@ -396,21 +401,36 @@ class PlaylistPlayer {
   }
 
   async jumpToRandomAnime() {
-    console.log('[9Anime Playlist] Jumping to random anime...');
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('[9Anime Playlist] 🎯 JUMPING TO RANDOM ANIME');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     if (this.selectedGenres.length === 0) {
-      console.warn('[9Anime Playlist] No genres selected, using Action');
+      console.warn('[9Anime Playlist] ⚠️ No genres selected, defaulting to Action');
       this.selectedGenres = ['Action'];
+      await this.saveState();
     }
 
     const genre = this.selectedGenres[Math.floor(Math.random() * this.selectedGenres.length)];
     const genreSlug = genre.toLowerCase().replace(/\s+/g, '-');
+    const genreUrl = 'https://9animetv.to/genre/' + genreSlug;
 
-    console.log('[9Anime Playlist] Fetching from genre:', genre);
+    console.log('[9Anime Playlist] 📂 Selected genre:', genre);
+    console.log('[9Anime Playlist] 🔗 Fetching URL:', genreUrl);
 
     try {
-      const response = await fetch('https://9animetv.to/genre/' + genreSlug);
+      console.log('[9Anime Playlist] 📡 Sending fetch request...');
+      const response = await fetch(genreUrl);
+      console.log('[9Anime Playlist] ✅ Response received:', response.status, response.statusText);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const html = await response.text();
+      console.log('[9Anime Playlist] 📄 HTML received, length:', html.length, 'bytes');
+
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
@@ -418,13 +438,32 @@ class PlaylistPlayer {
         .filter(a => !a.href.includes('?ep='))
         .map(a => a.href);
 
+      console.log('[9Anime Playlist] 🎬 Found', animeLinks.length, 'anime in genre');
+
       if (animeLinks.length > 0) {
         const randomAnime = animeLinks[Math.floor(Math.random() * animeLinks.length)];
-        console.log('[9Anime Playlist] Jumping to:', randomAnime);
+        console.log('[9Anime Playlist] 🎲 Randomly selected anime:', randomAnime);
+        console.log('[9Anime Playlist] 🚀 Navigating to new anime...');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         window.location.href = randomAnime;
+      } else {
+        console.error('[9Anime Playlist] ❌ No anime found in genre:', genre);
+        console.log('[9Anime Playlist] 🔄 Trying different genre...');
+        // Remove this genre and try another
+        this.selectedGenres = this.selectedGenres.filter(g => g !== genre);
+        if (this.selectedGenres.length > 0) {
+          await this.saveState();
+          this.jumpToRandomAnime();
+        } else {
+          console.error('[9Anime Playlist] ❌ No more genres to try!');
+        }
       }
     } catch (error) {
-      console.error('[9Anime Playlist] Error:', error);
+      console.error('[9Anime Playlist] ❌ ERROR fetching genre page:');
+      console.error('[9Anime Playlist]    Error:', error.message);
+      console.error('[9Anime Playlist]    Stack:', error.stack);
+      console.log('[9Anime Playlist] 🔄 Retrying in 3 seconds...');
+      setTimeout(() => this.jumpToRandomAnime(), 3000);
     }
   }
 
@@ -461,62 +500,124 @@ const isParentPage = window.location.hostname.includes('9animetv.to');
 const isVideoIframe = window.location.hostname.includes('rapid-cloud.co');
 
 if (isParentPage && window.location.pathname.includes('/watch/')) {
-  console.log('[9Anime Playlist] Running in parent page (9animetv.to)');
+  console.log('');
+  console.log('[9Anime Playlist] 🏠 RUNNING IN PARENT PAGE (9animetv.to)');
+  console.log('[9Anime Playlist] 📺 Creating playlist player instance...');
 
   // Create player instance
   const player = new PlaylistPlayer();
 
   // Listen for messages from video iframe
   window.addEventListener('message', (event) => {
+    // Log all messages for debugging
+    if (event.data.type && event.data.type.startsWith('VIDEO_')) {
+      console.log('');
+      console.log('[9Anime Playlist] 📨 MESSAGE RECEIVED FROM IFRAME:');
+      console.log('[9Anime Playlist]    Type:', event.data.type);
+      console.log('[9Anime Playlist]    Origin:', event.origin);
+      console.log('[9Anime Playlist]    Data:', event.data);
+    }
+
     if (event.data.type === 'VIDEO_ENDED') {
-      console.log('[9Anime Playlist] 🎬 Received VIDEO_ENDED message from iframe');
+      console.log('[9Anime Playlist] 🎬 VIDEO ENDED - Processing auto-advance...');
+      console.log('[9Anime Playlist]    Autoplay enabled:', player.autoplay);
+      console.log('[9Anime Playlist]    Auto-jump enabled:', player.autoJump);
+      console.log('[9Anime Playlist]    Queue length:', player.randomEpisodeQueue.length);
+
       if (player.autoplay) {
+        console.log('[9Anime Playlist] ⏳ Waiting 2 seconds before advancing...');
         setTimeout(() => {
-          console.log('[9Anime Playlist] ⏭️ Advancing to next episode...');
+          console.log('[9Anime Playlist] ⏭️ CALLING playNext()...');
           player.playNext();
         }, 2000);
+      } else {
+        console.log('[9Anime Playlist] ⏸️ Autoplay disabled, not advancing');
       }
     } else if (event.data.type === 'VIDEO_STATUS') {
-      // Optional: Log video status from iframe
-      if (event.data.remaining <= 5 && event.data.remaining > 0) {
-        console.log('[9Anime Playlist] ⏰ Less than 5 seconds remaining');
+      // Log video status periodically
+      if (event.data.remaining <= 10 && event.data.remaining > 0 && Math.floor(event.data.current) % 2 === 0) {
+        console.log(`[9Anime Playlist] ⏰ ${Math.floor(event.data.remaining)}s remaining`);
       }
+    } else if (event.data.type === 'VIDEO_FOUND') {
+      console.log('[9Anime Playlist] ✅ Video element detected in iframe');
     }
   });
 
   console.log('[9Anime Playlist] ✅ Message listener active, waiting for video events from iframe');
+  console.log('');
 }
 
 if (isVideoIframe) {
-  console.log('[9Anime Playlist] Running in video iframe (rapid-cloud.co)');
+  console.log('');
+  console.log('[9Anime Playlist] 🎥 RUNNING IN VIDEO IFRAME (rapid-cloud.co)');
+  console.log('[9Anime Playlist] 🔍 Searching for video element...');
 
   let videoFound = false;
   let lastLogTime = 0;
+  let watchAttempts = 0;
 
   // Watch for video element and attach listener
   const watchForVideo = setInterval(() => {
+    watchAttempts++;
     const video = document.querySelector('video');
+
+    if (!video && watchAttempts % 5 === 0) {
+      console.log(`[9Anime Playlist] ⏳ Still searching for video... (${watchAttempts}s)`);
+    }
 
     if (video && !videoFound) {
       videoFound = true;
-      console.log('[9Anime Playlist] ✅ Video element found in iframe!');
+      console.log('');
+      console.log('[9Anime Playlist] ━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('[9Anime Playlist] ✅ VIDEO ELEMENT FOUND!');
+      console.log('[9Anime Playlist] ━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('[9Anime Playlist]    Video src:', video.src || video.currentSrc || 'N/A');
+      console.log('[9Anime Playlist]    Duration:', video.duration || 'Loading...');
+      console.log('[9Anime Playlist]    Ready state:', video.readyState);
+      console.log('');
+
+      // Notify parent that video was found
+      window.parent.postMessage({ type: 'VIDEO_FOUND' }, '*');
 
       // Listen for video end
       video.addEventListener('ended', () => {
-        console.log('[9Anime Playlist] 🎬 Video ended in iframe! Posting message to parent...');
+        console.log('');
+        console.log('[9Anime Playlist] ━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('[9Anime Playlist] 🎬 VIDEO ENDED EVENT FIRED!');
+        console.log('[9Anime Playlist] ━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('[9Anime Playlist] 📤 Posting VIDEO_ENDED message to parent...');
         window.parent.postMessage({ type: 'VIDEO_ENDED' }, '*');
+        console.log('[9Anime Playlist] ✅ Message posted successfully');
+        console.log('');
       });
 
       // Also watch for pause at end
       video.addEventListener('pause', () => {
         if (video.currentTime >= video.duration - 1) {
-          console.log('[9Anime Playlist] Video paused at end, posting message...');
+          console.log('[9Anime Playlist] ⏸️ Video paused at end (backup detection)');
+          console.log('[9Anime Playlist]    Current time:', video.currentTime);
+          console.log('[9Anime Playlist]    Duration:', video.duration);
+          console.log('[9Anime Playlist] ⏳ Waiting 2s to confirm...');
           setTimeout(() => {
             if (video.paused && video.currentTime >= video.duration - 1) {
+              console.log('[9Anime Playlist] ✅ Confirmed: Video at end, posting VIDEO_ENDED');
               window.parent.postMessage({ type: 'VIDEO_ENDED' }, '*');
             }
           }, 2000);
         }
+      });
+
+      // Watch for play event
+      video.addEventListener('play', () => {
+        console.log('[9Anime Playlist] ▶️ Video started playing');
+      });
+
+      // Watch for error
+      video.addEventListener('error', (e) => {
+        console.error('[9Anime Playlist] ❌ VIDEO ERROR:');
+        console.error('[9Anime Playlist]    Error code:', video.error?.code);
+        console.error('[9Anime Playlist]    Error message:', video.error?.message);
+        console.error('[9Anime Playlist]    Event:', e);
       });
 
       // Periodic status updates
@@ -525,31 +626,39 @@ if (isVideoIframe) {
           const remaining = video.duration - video.currentTime;
           const currentTime = Math.floor(video.currentTime);
 
-          // Log every 5 seconds
-          if (currentTime % 5 === 0 && currentTime !== lastLogTime) {
-            console.log('[9Anime Playlist] Video status:', {
-              current: currentTime,
-              duration: Math.floor(video.duration),
-              remaining: Math.floor(remaining),
-              paused: video.paused,
-              ended: video.ended
-            });
+          // Log every 10 seconds
+          if (currentTime % 10 === 0 && currentTime !== lastLogTime && currentTime > 0) {
+            console.log('[9Anime Playlist] 📊 Status:',
+              `${Math.floor(currentTime / 60)}:${String(currentTime % 60).padStart(2, '0')}`,
+              '/',
+              `${Math.floor(video.duration / 60)}:${String(Math.floor(video.duration) % 60).padStart(2, '0')}`,
+              `(${Math.floor(remaining)}s left)`,
+              video.paused ? '[PAUSED]' : '[PLAYING]'
+            );
             lastLogTime = currentTime;
+          }
 
-            // Post status to parent
-            window.parent.postMessage({
-              type: 'VIDEO_STATUS',
-              current: currentTime,
-              duration: video.duration,
-              remaining: remaining,
-              paused: video.paused,
-              ended: video.ended
-            }, '*');
+          // Post status to parent
+          window.parent.postMessage({
+            type: 'VIDEO_STATUS',
+            current: currentTime,
+            duration: video.duration,
+            remaining: remaining,
+            paused: video.paused,
+            ended: video.ended
+          }, '*');
+
+          // Check if video ended (backup check)
+          if (video.ended && !video.paused) {
+            console.log('[9Anime Playlist] ⚠️ Video.ended=true detected in status check!');
+            window.parent.postMessage({ type: 'VIDEO_ENDED' }, '*');
           }
         }
       }, 1000);
 
-      console.log('[9Anime Playlist] ✅ Video event listeners attached in iframe');
+      console.log('[9Anime Playlist] ✅ All video event listeners attached');
+      console.log('[9Anime Playlist] 👂 Monitoring: ended, pause, play, error events');
+      console.log('');
     }
   }, 1000);
 }
