@@ -441,7 +441,7 @@ class AnimePlayer {
   }
 
   navigateToNextEpisode() {
-    console.log('[9Anime Player] Navigating to next episode:', this.nextEpisodeUrl);
+    console.log('[9Anime Player] Navigating to next episode...');
 
     // Notify background script
     browser.runtime.sendMessage({
@@ -452,8 +452,77 @@ class AnimePlayer {
       }
     });
 
-    // Navigate to next episode
-    window.location.href = this.nextEpisodeUrl;
+    // METHOD 1: Try to click the Next button first (even if hidden)
+    // This is more reliable as it uses the site's own navigation logic
+    const nextButton = this.findNextButton();
+    if (nextButton) {
+      console.log('[9Anime Player] Attempting to click Next button');
+      try {
+        // Try clicking even if hidden
+        nextButton.click();
+        console.log('[9Anime Player] Next button clicked successfully');
+
+        // Wait a moment to see if navigation happens
+        setTimeout(() => {
+          // If still on same page after 2 seconds, try manual navigation
+          if (window.location.href === this.nextEpisodeUrl || !this.nextEpisodeUrl) {
+            console.log('[9Anime Player] Button click succeeded');
+          } else {
+            console.log('[9Anime Player] Button click may have failed, trying manual navigation');
+            this.manualNavigate();
+          }
+        }, 2000);
+        return;
+      } catch (error) {
+        console.warn('[9Anime Player] Failed to click Next button:', error);
+      }
+    }
+
+    // METHOD 2: Manual navigation as fallback
+    this.manualNavigate();
+  }
+
+  findNextButton() {
+    // Search for Next button using multiple strategies
+    const strategies = [
+      // Strategy 1: By text content
+      () => {
+        const allLinks = Array.from(document.querySelectorAll('a, button'));
+        return allLinks.find(el => {
+          const text = el.textContent.trim().toLowerCase();
+          return text === 'next' || text === 'next episode' || text.includes('next ep');
+        });
+      },
+      // Strategy 2: By class/id
+      () => document.querySelector('.btn-next, #next-episode, [data-navigate="next"], .next-btn'),
+      // Strategy 3: By aria-label
+      () => document.querySelector('[aria-label*="next" i], [aria-label*="Next Episode" i]'),
+      // Strategy 4: By title attribute
+      () => document.querySelector('[title*="Next" i]')
+    ];
+
+    for (const strategy of strategies) {
+      try {
+        const button = strategy();
+        if (button && !button.classList.contains('disabled') && !button.hasAttribute('disabled')) {
+          return button;
+        }
+      } catch (e) {
+        // Strategy failed, try next
+      }
+    }
+
+    return null;
+  }
+
+  manualNavigate() {
+    if (this.nextEpisodeUrl) {
+      console.log('[9Anime Player] Manual navigation to:', this.nextEpisodeUrl);
+      window.location.href = this.nextEpisodeUrl;
+    } else {
+      console.error('[9Anime Player] No next episode URL available');
+      this.showNotification('Could not find next episode. Please navigate manually.');
+    }
   }
 
   async navigateToRandomAnime() {
