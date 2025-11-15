@@ -1,5 +1,14 @@
 // Content script for 9anime watch pages
+const DEBUG = true; // Set to false to reduce logging
+
+function debugLog(...args) {
+  if (DEBUG) console.log('[9Anime Player DEBUG]', ...args);
+}
+
 console.log('[9Anime Player] Content script loaded');
+console.log('[9Anime Player] URL:', window.location.href);
+console.log('[9Anime Player] Frame:', window === window.top ? 'main' : 'iframe');
+debugLog('Document readyState:', document.readyState);
 
 class AnimePlayer {
   constructor() {
@@ -195,12 +204,14 @@ class AnimePlayer {
 
   waitForVideo() {
     console.log('[9Anime Player] Waiting for video element...');
+    debugLog('Starting video search...');
 
     this.videoCheckInterval = setInterval(() => {
       this.videoCheckAttempts++;
 
       // Method 1: Check main document
       let video = document.querySelector('video');
+      if (video) debugLog('Video found in main document');
 
       // Method 2: Check all iframes
       if (!video) {
