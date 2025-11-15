@@ -14,7 +14,7 @@
   ],
 
   "background": {
-    "scripts": ["logger.js", "background.js"],
+    "scripts": ["background.js"],
     "persistent": true
   },
 
@@ -26,7 +26,7 @@
         "*://rapid-cloud.co/*",
         "*://*.rapid-cloud.co/*"
       ],
-      "js": ["logger.js", "content.js"],
+      "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_end",
       "all_frames": true

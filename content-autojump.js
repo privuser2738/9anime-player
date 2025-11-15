@@ -137,7 +137,7 @@ class PlaylistPlayer {
 
     const overlay = document.createElement('div');
     overlay.id = 'playlist-player-overlay';
-    overlay.innerHTML = '<div class="playlist-container"><div class="playlist-header"><h2>🎬 Playlist</h2><div class="playlist-info"><span id="current-episode">Ep ' + (this.currentIndex + 1) + '</span> / <span id="total-episodes">' + this.episodes.length + '</span></div><button id="close-playlist" class="btn-close">✕</button></div><div class="playlist-content"><div class="playlist-list" id="episode-list"></div></div><div class="playlist-controls"><button id="btn-prev" class="btn-control">⏮ Prev</button><button id="btn-play" class="btn-control btn-play">▶ Play</button><button id="btn-next" class="btn-control">Next ⏭</button><button id="btn-fullscreen" class="btn-control">⛶ FS</button><label class="control-option"><input type="checkbox" id="toggle-autoplay"> Autoplay</label><label class="control-option"><input type="checkbox" id="toggle-loop"> Loop</label><label class="control-option"><input type="checkbox" id="toggle-autojump"> 🎲 Auto-Jump</label><button id="btn-genres" class="btn-control btn-genres">🎯 Genres</button></div><div class="genre-selector" id="genre-selector" style="display:none"><div class="genre-header"><h3>Select Genres for Auto-Jump</h3><p style="font-size:12px;opacity:0.8;margin:5px 0">Plays 3-8 random episodes from random anime in selected genres</p><button id="close-genres" class="btn-close-small">✕</button></div><div class="genre-grid" id="genre-grid"></div><div class="genre-footer"><span id="selected-count">' + this.selectedGenres.length + ' genres selected</span><button id="apply-genres" class="btn-apply">Apply</button></div></div></div>';
+    overlay.innerHTML = '<div class="playlist-container"><div class="playlist-header"><h2>🎬 Playlist</h2><div class="playlist-info"><span id="current-episode">Ep ' + (this.currentIndex + 1) + '</span> / <span id="total-episodes">' + this.episodes.length + '</span></div><button id="close-playlist" class="btn-close">✕</button></div><div class="playlist-content"><div class="playlist-list" id="episode-list"></div></div><div class="playlist-controls"><button id="btn-prev" class="btn-control">⏮ Prev</button><button id="btn-play" class="btn-control btn-play">▶ Play</button><button id="btn-next" class="btn-control">Next ⏭</button><button id="btn-fullscreen" class="btn-control">⛶ FS</button><button id="btn-get-video-url" class="btn-control" style="background:linear-gradient(135deg,#f59e0b,#d97706);font-weight:600;">🎬 Get Video URL</button><label class="control-option"><input type="checkbox" id="toggle-autoplay"> Autoplay</label><label class="control-option"><input type="checkbox" id="toggle-loop"> Loop</label><label class="control-option"><input type="checkbox" id="toggle-autojump"> 🎲 Auto-Jump</label><button id="btn-genres" class="btn-control btn-genres">🎯 Genres</button></div><div class="download-controls" style="padding:10px;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.1);"><div style="font-size:11px;opacity:0.7;margin-bottom:6px;">⬇️ Download All Episodes:</div><button id="btn-download-urls" class="btn-download">📄 URLs List</button><button id="btn-download-m3u" class="btn-download">📺 M3U Playlist</button></div><div id="video-url-display" style="display:none;padding:10px;background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.1);"><div style="font-size:11px;opacity:0.7;margin-bottom:6px;">🎬 Video URL (for yt-dlp):</div><input type="text" id="video-url-input" readonly style="width:100%;padding:6px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);color:#4ade80;font-size:11px;font-family:monospace;border-radius:4px;margin-bottom:6px;"><button id="btn-copy-url" style="padding:6px 12px;background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;width:100%;">📋 Copy to Clipboard</button></div><div class="genre-selector" id="genre-selector" style="display:none"><div class="genre-header"><h3>Select Genres for Auto-Jump</h3><p style="font-size:12px;opacity:0.8;margin:5px 0">Plays 3-8 random episodes from random anime in selected genres</p><button id="close-genres" class="btn-close-small">✕</button></div><div class="genre-grid" id="genre-grid"></div><div class="genre-footer"><span id="selected-count">' + this.selectedGenres.length + ' genres selected</span><button id="apply-genres" class="btn-apply">Apply</button></div></div></div>';
 
     document.body.appendChild(overlay);
     this.addStyles();
@@ -291,6 +291,14 @@ class PlaylistPlayer {
       const count = document.querySelectorAll('#genre-grid input:checked').length;
       document.getElementById('selected-count').textContent = count + ' genres selected';
     });
+
+    // Download buttons
+    document.getElementById('btn-download-urls').addEventListener('click', () => this.downloadURLsList());
+    document.getElementById('btn-download-m3u').addEventListener('click', () => this.downloadM3UPlaylist());
+
+    // Get Video URL button
+    document.getElementById('btn-get-video-url').addEventListener('click', () => this.getVideoURL());
+    document.getElementById('btn-copy-url')?.addEventListener('click', () => this.copyVideoURL());
   }
 
   initAutoJump() {
@@ -488,9 +496,108 @@ class PlaylistPlayer {
     }
   }
 
+  downloadURLsList() {
+    console.log('[9Anime Playlist] 📄 Generating URLs list for download...');
+
+    const currentAnime = window.location.pathname.split('/watch/')[1]?.split('?')[0] || 'anime';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${currentAnime}_episodes_${timestamp}.txt`;
+
+    // Create text content
+    let content = `# ${currentAnime} - Episode URLs\n`;
+    content += `# Generated: ${new Date().toLocaleString()}\n`;
+    content += `# Total Episodes: ${this.episodes.length}\n`;
+    content += `#\n`;
+    content += `# Format: Episode Number | Episode ID | URL\n`;
+    content += `# ` + '='.repeat(70) + `\n\n`;
+
+    this.episodes.forEach((ep, index) => {
+      content += `${(index + 1).toString().padStart(3, '0')} | ${ep.id} | ${ep.url}\n`;
+    });
+
+    // Create download
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    console.log(`[9Anime Playlist] ✅ Downloaded: ${filename} (${this.episodes.length} episodes)`);
+  }
+
+  downloadM3UPlaylist() {
+    console.log('[9Anime Playlist] 📺 Generating M3U playlist for download...');
+
+    const currentAnime = window.location.pathname.split('/watch/')[1]?.split('?')[0] || 'anime';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${currentAnime}_playlist_${timestamp}.m3u`;
+
+    // Create M3U content
+    let content = `#EXTM3U\n`;
+    content += `#PLAYLIST:${currentAnime}\n`;
+    content += `#EXTGENRE:Anime\n\n`;
+
+    this.episodes.forEach((ep, index) => {
+      content += `#EXTINF:-1,${ep.title || `Episode ${index + 1}`}\n`;
+      content += `${ep.url}\n`;
+    });
+
+    // Create download
+    const blob = new Blob([content], { type: 'audio/x-mpegurl' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    console.log(`[9Anime Playlist] ✅ Downloaded: ${filename} (${this.episodes.length} episodes)`);
+  }
+
+  getVideoURL() {
+    console.log('[9Anime Playlist] 🎬 Requesting video URL from iframe...');
+
+    // Store reference for message listener
+    window.currentVideoURLRequest = true;
+
+    // Request video URL from all iframes
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      iframe.contentWindow.postMessage({ type: 'GET_VIDEO_URL' }, '*');
+    });
+
+    // Show loading state
+    const display = document.getElementById('video-url-display');
+    const input = document.getElementById('video-url-input');
+    display.style.display = 'block';
+    input.value = 'Requesting video URL from player...';
+  }
+
+  copyVideoURL() {
+    const input = document.getElementById('video-url-input');
+    const url = input.value;
+
+    if (url && url !== 'Requesting video URL from player...' && url !== 'Video URL not found') {
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('btn-copy-url');
+        const originalText = btn.textContent;
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 2000);
+        console.log('[9Anime Playlist] ✅ Video URL copied to clipboard');
+      }).catch(err => {
+        console.error('[9Anime Playlist] ❌ Failed to copy:', err);
+        alert('Failed to copy. Please select and copy manually.');
+      });
+    }
+  }
+
   addStyles() {
     const style = document.createElement('style');
-    style.textContent = '#playlist-player-overlay{position:fixed;top:20px;right:20px;width:400px;max-height:80vh;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:15px;box-shadow:0 10px 50px rgba(0,0,0,0.5);z-index:999999;font-family:sans-serif;color:white;overflow:hidden}.playlist-container{display:flex;flex-direction:column;height:100%}.playlist-header{padding:15px;background:rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}.playlist-header h2{margin:0;font-size:16px}.playlist-info{font-size:13px;color:#aaa}.btn-close{background:rgba(255,255,255,0.1);border:none;color:white;font-size:18px;width:28px;height:28px;border-radius:50%;cursor:pointer}.playlist-content{flex:1;overflow-y:auto;padding:10px}.episode-item{display:flex;align-items:center;padding:10px;background:rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;margin-bottom:5px;gap:10px;transition:all 0.2s}.episode-item:hover{background:rgba(255,255,255,0.1);transform:translateX(5px)}.episode-item.active{background:linear-gradient(135deg,#667eea,#764ba2);box-shadow:0 4px 15px rgba(102,126,234,0.4)}.episode-number{font-weight:700;min-width:30px;font-size:14px}.episode-title{flex:1;font-size:13px}.playlist-controls{padding:12px;background:rgba(0,0,0,0.2);border-top:1px solid rgba(255,255,255,0.1);display:flex;flex-wrap:wrap;gap:6px}.btn-control{padding:6px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;border-radius:6px;cursor:pointer;font-size:12px;transition:all 0.2s}.btn-control:hover{background:rgba(255,255,255,0.2)}.btn-play{background:linear-gradient(135deg,#667eea,#764ba2);border:none;font-weight:600}.control-option{display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 8px;cursor:pointer}.genre-selector{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);display:flex;flex-direction:column}.genre-header{padding:15px;border-bottom:1px solid rgba(255,255,255,0.1);position:relative}.genre-header h3{margin:0 0 5px 0;font-size:16px}.btn-close-small{position:absolute;top:15px;right:15px;background:rgba(255,255,255,0.1);border:none;color:white;width:26px;height:26px;border-radius:50%;cursor:pointer}.genre-grid{flex:1;overflow-y:auto;padding:15px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-height:calc(80vh - 180px)}.genre-item{display:flex;align-items:center;gap:6px;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;transition:all 0.2s;font-size:13px}.genre-item:hover{background:rgba(255,255,255,0.1)}.genre-item input:checked+span{color:#4ade80;font-weight:600}.genre-footer{padding:15px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}.btn-apply{padding:8px 20px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600}';
+    style.textContent = '#playlist-player-overlay{position:fixed;top:20px;right:20px;width:400px;max-height:80vh;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:15px;box-shadow:0 10px 50px rgba(0,0,0,0.5);z-index:999999;font-family:sans-serif;color:white;overflow:hidden}.playlist-container{display:flex;flex-direction:column;height:100%}.playlist-header{padding:15px;background:rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}.playlist-header h2{margin:0;font-size:16px}.playlist-info{font-size:13px;color:#aaa}.btn-close{background:rgba(255,255,255,0.1);border:none;color:white;font-size:18px;width:28px;height:28px;border-radius:50%;cursor:pointer}.playlist-content{flex:1;overflow-y:auto;padding:10px}.episode-item{display:flex;align-items:center;padding:10px;background:rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;margin-bottom:5px;gap:10px;transition:all 0.2s}.episode-item:hover{background:rgba(255,255,255,0.1);transform:translateX(5px)}.episode-item.active{background:linear-gradient(135deg,#667eea,#764ba2);box-shadow:0 4px 15px rgba(102,126,234,0.4)}.episode-number{font-weight:700;min-width:30px;font-size:14px}.episode-title{flex:1;font-size:13px}.playlist-controls{padding:12px;background:rgba(0,0,0,0.2);border-top:1px solid rgba(255,255,255,0.1);display:flex;flex-wrap:wrap;gap:6px}.btn-control{padding:6px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;border-radius:6px;cursor:pointer;font-size:12px;transition:all 0.2s}.btn-control:hover{background:rgba(255,255,255,0.2)}.btn-play{background:linear-gradient(135deg,#667eea,#764ba2);border:none;font-weight:600}.btn-download{padding:8px 16px;background:linear-gradient(135deg,#10b981,#059669);border:none;color:white;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s;box-shadow:0 2px 8px rgba(16,185,129,0.3)}.btn-download:hover{background:linear-gradient(135deg,#059669,#047857);transform:translateY(-2px);box-shadow:0 4px 12px rgba(16,185,129,0.4)}.control-option{display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 8px;cursor:pointer}.genre-selector{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);display:flex;flex-direction:column}.genre-header{padding:15px;border-bottom:1px solid rgba(255,255,255,0.1);position:relative}.genre-header h3{margin:0 0 5px 0;font-size:16px}.btn-close-small{position:absolute;top:15px;right:15px;background:rgba(255,255,255,0.1);border:none;color:white;width:26px;height:26px;border-radius:50%;cursor:pointer}.genre-grid{flex:1;overflow-y:auto;padding:15px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-height:calc(80vh - 180px)}.genre-item{display:flex;align-items:center;gap:6px;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;cursor:pointer;transition:all 0.2s;font-size:13px}.genre-item:hover{background:rgba(255,255,255,0.1)}.genre-item input:checked+span{color:#4ade80;font-weight:600}.genre-footer{padding:15px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}.btn-apply{padding:8px 20px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600}';
     document.head.appendChild(style);
   }
 }
@@ -540,6 +647,16 @@ if (isParentPage && window.location.pathname.includes('/watch/')) {
       }
     } else if (event.data.type === 'VIDEO_FOUND') {
       console.log('[9Anime Playlist] ✅ Video element detected in iframe');
+    } else if (event.data.type === 'VIDEO_URL') {
+      console.log('[9Anime Playlist] 🎬 Received video URL from iframe');
+      const input = document.getElementById('video-url-input');
+      if (input && event.data.url) {
+        input.value = event.data.url;
+        console.log('[9Anime Playlist] ✅ Video URL:', event.data.url);
+      } else {
+        input.value = 'Video URL not found';
+        console.warn('[9Anime Playlist] ⚠️ No video URL in response');
+      }
     }
   });
 
@@ -618,6 +735,19 @@ if (isVideoIframe) {
         console.error('[9Anime Playlist]    Error code:', video.error?.code);
         console.error('[9Anime Playlist]    Error message:', video.error?.message);
         console.error('[9Anime Playlist]    Event:', e);
+      });
+
+      // Listen for GET_VIDEO_URL requests from parent
+      window.addEventListener('message', (event) => {
+        if (event.data.type === 'GET_VIDEO_URL') {
+          console.log('[9Anime Playlist] 📨 Received GET_VIDEO_URL request from parent');
+          const videoURL = video.src || video.currentSrc || '';
+          console.log('[9Anime Playlist] 🎬 Sending video URL:', videoURL);
+          window.parent.postMessage({
+            type: 'VIDEO_URL',
+            url: videoURL
+          }, '*');
+        }
       });
 
       // Periodic status updates

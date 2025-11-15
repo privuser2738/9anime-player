@@ -1,0 +1,43 @@
+{
+  "name": "9anime-downloader-cli",
+  "version": "1.0.0",
+  "description": "Random anime episode downloader CLI - downloads random episodes from random anime (2020+)",
+  "main": "index.js",
+  "bin": {
+    "9anime-dl": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "build": "./build-binary-linux.sh"
+  },
+  "keywords": ["anime", "downloader", "cli", "9anime", "random"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^8.2.5",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "node-fetch": "^2.7.0",
+    "cheerio": "1.0.0-rc.10",
+    "execa": "^5.1.1",
+    "cli-progress": "^3.12.0",
+    "puppeteer": "^19.11.1"
+  },
+  "devDependencies": {
+    "pkg": "5.8.0"
+  },
+  "pkg": {
+    "targets": [ "node18-linux-x64" ],
+    "outputPath": "bin",
+    "scripts": [
+      "index.js",
+      "lib/**/*.js"
+    ],
+    "assets": [
+      "node_modules/**/*"
+    ],
+    "ignore": [
+      "node_modules/undici/lib/cache/**"
+    ]
+  }
+}
