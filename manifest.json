@@ -21,7 +21,8 @@
       "matches": ["*://9animetv.to/watch/*", "*://*.9animetv.to/watch/*"],
       "js": ["content.js"],
       "css": ["styles.css"],
-      "run_at": "document_end"
+      "run_at": "document_end",
+      "all_frames": true
     }
   ],
 

@@ -6,18 +6,24 @@ class AnimePlayer {
     this.video = null;
     this.currentAnime = null;
     this.currentEpisode = null;
+    this.currentEpisodeId = null;
     this.genres = [];
     this.nextEpisodeUrl = null;
     this.isLastEpisode = false;
     this.transitionOverlay = null;
     this.fullscreenRequested = false;
     this.videoCheckInterval = null;
+    this.videoCheckAttempts = 0;
+    this.hasUserInteracted = false;
 
     this.init();
   }
 
   init() {
     console.log('[9Anime Player] Initializing...');
+
+    // Detect user interaction for fullscreen
+    this.detectUserInteraction();
 
     // Extract anime info from page
     this.extractAnimeInfo();
@@ -28,66 +34,161 @@ class AnimePlayer {
     // Set up mutation observer for dynamic content
     this.observePageChanges();
 
-    // Auto-start fullscreen on load
-    setTimeout(() => this.enterFullscreen(), 2000);
+    // Monitor for iframes being added
+    this.monitorIframes();
+  }
+
+  detectUserInteraction() {
+    const interactionHandler = () => {
+      console.log('[9Anime Player] User interaction detected');
+      this.hasUserInteracted = true;
+      // Try to enter fullscreen after user interaction
+      if (this.video && !this.fullscreenRequested) {
+        setTimeout(() => this.enterFullscreen(), 1000);
+      }
+    };
+
+    // Listen for various user interactions
+    ['click', 'keydown', 'touchstart'].forEach(eventType => {
+      document.addEventListener(eventType, interactionHandler, { once: true });
+    });
   }
 
   extractAnimeInfo() {
     try {
-      // Extract anime title
-      const titleElement = document.querySelector('h1, .title, [class*="title"]');
-      this.currentAnime = titleElement ? titleElement.textContent.trim() : 'Unknown Anime';
+      // Extract anime title from breadcrumb or title
+      const breadcrumb = document.querySelector('.film-name, h1.title, h2.film-name');
+      this.currentAnime = breadcrumb ? breadcrumb.textContent.trim() : 'Unknown Anime';
 
       // Extract genres
       const genreElements = document.querySelectorAll('a[href*="/genre/"]');
-      this.genres = Array.from(genreElements).map(el => el.textContent.trim());
+      this.genres = Array.from(genreElements).map(el => el.textContent.trim()).filter(g => g);
 
-      // Extract current episode from URL or page
-      const urlMatch = window.location.pathname.match(/ep-(\d+)/i);
-      if (urlMatch) {
-        this.currentEpisode = parseInt(urlMatch[1]);
+      // Extract current episode ID from URL parameters (?ep=XXXXX)
+      const urlParams = new URLSearchParams(window.location.search);
+      this.currentEpisodeId = urlParams.get('ep');
+
+      // Extract episode number from page text or active episode
+      const activeEpisode = document.querySelector('.ep-item.active, .episode.active, [class*="active"]');
+      if (activeEpisode) {
+        const epText = activeEpisode.textContent.match(/\d+/);
+        this.currentEpisode = epText ? parseInt(epText[0]) : 1;
       } else {
         // Try to find episode number in page content
-        const episodeText = document.body.textContent.match(/episode\s+(\d+)/i);
+        const episodeText = document.body.textContent.match(/Episode\s+(\d+)/i);
         this.currentEpisode = episodeText ? parseInt(episodeText[1]) : 1;
       }
 
-      // Find next/prev episode links
-      this.findEpisodeNavigation();
-
-      console.log('[9Anime Player] Anime info:', {
+      console.log('[9Anime Player] Extracted info:', {
         anime: this.currentAnime,
         episode: this.currentEpisode,
+        episodeId: this.currentEpisodeId,
         genres: this.genres,
-        nextUrl: this.nextEpisodeUrl,
-        isLast: this.isLastEpisode
+        url: window.location.href
       });
+
+      // Find next/prev episode links
+      setTimeout(() => this.findEpisodeNavigation(), 2000);
+
     } catch (error) {
       console.error('[9Anime Player] Error extracting anime info:', error);
     }
   }
 
   findEpisodeNavigation() {
-    // Look for Next button
-    const nextButton = document.querySelector('a.btn-next, a[title*="Next"], a:contains("Next"), .next-episode');
-    if (nextButton && nextButton.href) {
-      this.nextEpisodeUrl = nextButton.href;
-      this.isLastEpisode = false;
-    } else {
-      // Try to construct next episode URL
-      const currentUrl = window.location.href;
-      const epMatch = currentUrl.match(/(.*ep-)(\d+)(.*)/);
-      if (epMatch) {
-        const nextEp = parseInt(epMatch[2]) + 1;
-        this.nextEpisodeUrl = `${epMatch[1]}${nextEp}${epMatch[3]}`;
-      } else {
-        this.isLastEpisode = true;
-      }
+    console.log('[9Anime Player] Finding episode navigation...');
+
+    // Method 1: Look for Next button by text content
+    const allLinks = Array.from(document.querySelectorAll('a'));
+    let nextButton = allLinks.find(a => {
+      const text = a.textContent.trim().toLowerCase();
+      return text === 'next' || text.includes('next ep');
+    });
+
+    // Method 2: Look for Next button by class
+    if (!nextButton) {
+      nextButton = document.querySelector('.btn-next, #next-episode, [data-navigate="next"]');
     }
 
-    // Check if "Next" button is disabled
-    const nextBtnDisabled = document.querySelector('.btn-next.disabled, .next-episode.disabled');
-    if (nextBtnDisabled) {
+    // Check if next button exists and is not disabled
+    if (nextButton) {
+      const isDisabled = nextButton.classList.contains('disabled') ||
+                        nextButton.hasAttribute('disabled') ||
+                        nextButton.getAttribute('aria-disabled') === 'true';
+
+      if (isDisabled) {
+        console.log('[9Anime Player] Next button is disabled - last episode');
+        this.isLastEpisode = true;
+        return;
+      }
+
+      // Try to get href or data attributes
+      if (nextButton.href && !nextButton.href.includes('javascript:')) {
+        this.nextEpisodeUrl = nextButton.href;
+        console.log('[9Anime Player] Found next episode URL from button:', this.nextEpisodeUrl);
+      } else {
+        // Next button exists but uses JavaScript - try to find next episode in list
+        this.findNextInEpisodeList();
+      }
+    } else {
+      console.log('[9Anime Player] No next button found, trying episode list');
+      this.findNextInEpisodeList();
+    }
+
+    console.log('[9Anime Player] Navigation result:', {
+      nextUrl: this.nextEpisodeUrl,
+      isLast: this.isLastEpisode
+    });
+  }
+
+  findNextInEpisodeList() {
+    // Look for episode list and find next episode
+    const episodeItems = document.querySelectorAll('.ep-item, .episode-item, [class*="episode"]');
+
+    if (episodeItems.length > 0) {
+      console.log('[9Anime Player] Found', episodeItems.length, 'episode items');
+
+      // Find current episode in list
+      let foundCurrent = false;
+      for (let i = 0; i < episodeItems.length; i++) {
+        const item = episodeItems[i];
+
+        // Check if this is the current episode
+        if (item.classList.contains('active') ||
+            item.getAttribute('data-id') === this.currentEpisodeId) {
+          foundCurrent = true;
+
+          // Get next episode
+          if (i < episodeItems.length - 1) {
+            const nextItem = episodeItems[i + 1];
+            const nextLink = nextItem.querySelector('a') || nextItem;
+
+            if (nextLink.href && !nextLink.href.includes('javascript:')) {
+              this.nextEpisodeUrl = nextLink.href;
+              this.isLastEpisode = false;
+              console.log('[9Anime Player] Found next episode in list:', this.nextEpisodeUrl);
+            } else {
+              // Try to get data-id and construct URL
+              const nextEpId = nextItem.getAttribute('data-id');
+              if (nextEpId) {
+                this.nextEpisodeUrl = `${window.location.pathname}?ep=${nextEpId}`;
+                this.isLastEpisode = false;
+                console.log('[9Anime Player] Constructed next URL from data-id:', this.nextEpisodeUrl);
+              }
+            }
+          } else {
+            console.log('[9Anime Player] Current episode is last in list');
+            this.isLastEpisode = true;
+          }
+          break;
+        }
+      }
+
+      if (!foundCurrent) {
+        console.warn('[9Anime Player] Could not find current episode in list');
+      }
+    } else {
+      console.warn('[9Anime Player] No episode list found');
       this.isLastEpisode = true;
     }
   }
@@ -96,24 +197,93 @@ class AnimePlayer {
     console.log('[9Anime Player] Waiting for video element...');
 
     this.videoCheckInterval = setInterval(() => {
-      // Look for video element in various possible containers
-      const video = document.querySelector('video');
+      this.videoCheckAttempts++;
+
+      // Method 1: Check main document
+      let video = document.querySelector('video');
+
+      // Method 2: Check all iframes
+      if (!video) {
+        const iframes = document.querySelectorAll('iframe');
+        for (const iframe of iframes) {
+          try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            if (iframeDoc) {
+              video = iframeDoc.querySelector('video');
+              if (video) {
+                console.log('[9Anime Player] Video found in iframe!');
+                break;
+              }
+            }
+          } catch (e) {
+            // Cross-origin iframe, can't access
+          }
+        }
+      }
+
+      // Method 3: Check shadow DOM
+      if (!video) {
+        const shadowHosts = document.querySelectorAll('*');
+        for (const host of shadowHosts) {
+          if (host.shadowRoot) {
+            video = host.shadowRoot.querySelector('video');
+            if (video) {
+              console.log('[9Anime Player] Video found in shadow DOM!');
+              break;
+            }
+          }
+        }
+      }
 
       if (video && !this.video) {
-        console.log('[9Anime Player] Video element found!');
+        console.log('[9Anime Player] Video element found after', this.videoCheckAttempts, 'attempts!');
         this.video = video;
         clearInterval(this.videoCheckInterval);
         this.setupVideoListeners();
-      }
-    }, 500);
 
-    // Give up after 30 seconds
+        // Try fullscreen after video is found and user has interacted
+        if (this.hasUserInteracted) {
+          setTimeout(() => this.enterFullscreen(), 1000);
+        }
+      }
+
+      // Log progress every 10 attempts
+      if (this.videoCheckAttempts % 10 === 0) {
+        console.log('[9Anime Player] Still searching for video... attempt', this.videoCheckAttempts);
+      }
+    }, 1000); // Check every 1 second
+
+    // Give up after 60 seconds
     setTimeout(() => {
       if (this.videoCheckInterval) {
         clearInterval(this.videoCheckInterval);
-        console.warn('[9Anime Player] Video element not found after 30s');
+        console.error('[9Anime Player] Video element not found after 60 seconds');
+        console.log('[9Anime Player] Page iframes:', document.querySelectorAll('iframe').length);
+        console.log('[9Anime Player] Please check browser console for errors');
       }
-    }, 30000);
+    }, 60000);
+  }
+
+  monitorIframes() {
+    // Watch for iframes being added dynamically
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.tagName === 'IFRAME') {
+            console.log('[9Anime Player] New iframe detected, checking for video...');
+            // Re-trigger video search
+            if (!this.video && !this.videoCheckInterval) {
+              this.waitForVideo();
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 
   setupVideoListeners() {
@@ -121,9 +291,14 @@ class AnimePlayer {
 
     console.log('[9Anime Player] Setting up video listeners');
 
+    // Show notification to user
+    this.showNotification('9Anime Player Active! Click anywhere to enter fullscreen mode.');
+
     // Auto-play video
     this.video.play().catch(err => {
       console.warn('[9Anime Player] Auto-play failed:', err);
+      // If auto-play fails, show notification
+      this.showNotification('Click the video to start playback and enable fullscreen');
     });
 
     // Monitor video time for transition overlay
@@ -350,24 +525,82 @@ class AnimePlayer {
   }
 
   enterFullscreen() {
-    // Find the video container or video element
-    const videoContainer = document.querySelector('.player-container, .video-container, #player') || this.video;
+    if (!this.video) {
+      console.warn('[9Anime Player] Cannot enter fullscreen - no video element');
+      return;
+    }
 
-    if (videoContainer) {
-      const requestFullscreen = videoContainer.requestFullscreen ||
-        videoContainer.mozRequestFullScreen ||
-        videoContainer.webkitRequestFullscreen ||
-        videoContainer.msRequestFullscreen;
+    // Try different elements for fullscreen
+    const candidates = [
+      // Try video element itself first
+      this.video,
+      // Try common player containers
+      this.video.parentElement,
+      this.video.closest('.player-container'),
+      this.video.closest('.video-container'),
+      this.video.closest('#player'),
+      this.video.closest('[class*="player"]'),
+      // Try entire document as fallback
+      document.documentElement
+    ].filter(el => el);
+
+    for (const element of candidates) {
+      const requestFullscreen = element.requestFullscreen ||
+        element.mozRequestFullScreen ||
+        element.webkitRequestFullscreen ||
+        element.msRequestFullscreen;
 
       if (requestFullscreen) {
-        requestFullscreen.call(videoContainer).then(() => {
-          console.log('[9Anime Player] Fullscreen requested');
+        console.log('[9Anime Player] Attempting fullscreen on:', element.tagName, element.className);
+
+        requestFullscreen.call(element).then(() => {
+          console.log('[9Anime Player] Fullscreen activated successfully!');
           this.fullscreenRequested = true;
+          return;
         }).catch(err => {
-          console.warn('[9Anime Player] Fullscreen request failed:', err);
+          console.warn('[9Anime Player] Fullscreen attempt failed:', err.message);
+          // Try next candidate
         });
+
+        // Only try first compatible element
+        break;
       }
     }
+  }
+
+  showNotification(message) {
+    // Create a notification overlay
+    const notification = document.createElement('div');
+    notification.className = 'anime-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      z-index: 999998;
+      animation: slideIn 0.5s ease-out;
+      max-width: 300px;
+    `;
+
+    document.body.appendChild(notification);
+
+    // Remove after 5 seconds
+    setTimeout(() => {
+      notification.style.animation = 'slideOut 0.5s ease-out';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 500);
+    }, 5000);
   }
 
   observePageChanges() {
