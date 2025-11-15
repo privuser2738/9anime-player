@@ -8,7 +8,9 @@
     "storage",
     "tabs",
     "*://9animetv.to/*",
-    "*://*.9animetv.to/*"
+    "*://*.9animetv.to/*",
+    "*://rapid-cloud.co/*",
+    "*://*.rapid-cloud.co/*"
   ],
 
   "background": {
@@ -18,7 +20,12 @@
 
   "content_scripts": [
     {
-      "matches": ["*://9animetv.to/watch/*", "*://*.9animetv.to/watch/*"],
+      "matches": [
+        "*://9animetv.to/watch/*",
+        "*://*.9animetv.to/watch/*",
+        "*://rapid-cloud.co/*",
+        "*://*.rapid-cloud.co/*"
+      ],
       "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_end",

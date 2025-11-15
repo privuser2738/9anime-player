@@ -1,0 +1,328 @@
+// Simplified 9Anime Auto-Player - Uses click simulation and URL navigation
+console.log('[9Anime AutoPlay] Simple version loaded');
+
+class SimpleAnimePlayer {
+  constructor() {
+    this.currentEpisodeId = null;
+    this.nextEpisodeUrl = null;
+    this.episodes = [];
+    this.autoPlayTimer = null;
+    this.checkInterval = null;
+
+    this.init();
+  }
+
+  init() {
+    console.log('[9Anime AutoPlay] Initializing simple player...');
+
+    // Extract current episode from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    this.currentEpisodeId = urlParams.get('ep');
+    console.log('[9Anime AutoPlay] Current episode ID:', this.currentEpisodeId);
+
+    // Wait for page to load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.start());
+    } else {
+      this.start();
+    }
+  }
+
+  start() {
+    console.log('[9Anime AutoPlay] Starting...');
+
+    // Step 1: Click play button after page loads
+    setTimeout(() => this.clickPlayButton(), 2000);
+
+    // Step 2: Find next episode
+    setTimeout(() => this.findNextEpisode(), 3000);
+
+    // Step 3: Request fullscreen after user interaction
+    this.setupFullscreenTrigger();
+
+    // Step 4: Monitor for video end or set timer
+    setTimeout(() => this.setupAutoAdvance(), 5000);
+  }
+
+  clickPlayButton() {
+    console.log('[9Anime AutoPlay] Looking for play button...');
+
+    // Try multiple play button selectors
+    const playSelectors = [
+      'button.play',
+      'button[aria-label*="play" i]',
+      'button[title*="play" i]',
+      '.vjs-big-play-button',
+      '.video-play-button',
+      'button.btn-play',
+      '[class*="play"][class*="button"]',
+      // Generic video controls
+      'video ~ button',
+      'video + button',
+    ];
+
+    for (const selector of playSelectors) {
+      const buttons = document.querySelectorAll(selector);
+      if (buttons.length > 0) {
+        console.log('[9Anime AutoPlay] Found play button with selector:', selector);
+        buttons.forEach(btn => {
+          try {
+            btn.click();
+            console.log('[9Anime AutoPlay] ✅ Clicked play button');
+          } catch (e) {
+            console.warn('[9Anime AutoPlay] Failed to click:', e);
+          }
+        });
+        return;
+      }
+    }
+
+    // Fallback: Try to find and click any video element
+    const videos = document.querySelectorAll('video');
+    if (videos.length > 0) {
+      console.log('[9Anime AutoPlay] Found video element, trying to click it');
+      videos[0].click();
+
+      // Also try to call play() directly
+      videos[0].play().then(() => {
+        console.log('[9Anime AutoPlay] ✅ Video.play() succeeded');
+      }).catch(err => {
+        console.log('[9Anime AutoPlay] Video.play() failed:', err.message);
+      });
+    }
+
+    // Try again in iframes
+    this.clickPlayInIframes();
+  }
+
+  clickPlayInIframes() {
+    const iframes = document.querySelectorAll('iframe');
+    console.log('[9Anime AutoPlay] Checking', iframes.length, 'iframes for play button');
+
+    iframes.forEach((iframe, i) => {
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        if (iframeDoc) {
+          // Try to find play button in iframe
+          const playBtn = iframeDoc.querySelector('button[class*="play"], .vjs-big-play-button');
+          if (playBtn) {
+            console.log('[9Anime AutoPlay] ✅ Found play button in iframe', i);
+            playBtn.click();
+          }
+
+          // Try to play video directly
+          const video = iframeDoc.querySelector('video');
+          if (video) {
+            console.log('[9Anime AutoPlay] Found video in iframe', i);
+            video.play().catch(e => console.log('Iframe video play failed:', e.message));
+          }
+        }
+      } catch (e) {
+        // Cross-origin iframe, can't access
+        console.log('[9Anime AutoPlay] Cannot access iframe', i, '(cross-origin)');
+      }
+    });
+  }
+
+  findNextEpisode() {
+    console.log('[9Anime AutoPlay] Finding next episode...');
+
+    // Method 1: Find in episode list
+    const episodeSelectors = [
+      '.ep-item',
+      '.episode-item',
+      '[class*="episode"]',
+      '[data-id]',
+      'a[href*="?ep="]'
+    ];
+
+    for (const selector of episodeSelectors) {
+      const items = Array.from(document.querySelectorAll(selector));
+      if (items.length > 0) {
+        console.log('[9Anime AutoPlay] Found', items.length, 'episodes with selector:', selector);
+        this.episodes = items;
+
+        // Find current episode index
+        const currentIndex = items.findIndex(item => {
+          const itemEpId = item.getAttribute('data-id') ||
+                          new URLSearchParams(item.href?.split('?')[1] || '').get('ep');
+          return itemEpId === this.currentEpisodeId || item.classList.contains('active');
+        });
+
+        if (currentIndex >= 0) {
+          console.log('[9Anime AutoPlay] Current episode index:', currentIndex);
+
+          // Get next episode
+          if (currentIndex < items.length - 1) {
+            const nextItem = items[currentIndex + 1];
+            this.nextEpisodeUrl = nextItem.href || nextItem.querySelector('a')?.href;
+
+            if (!this.nextEpisodeUrl) {
+              // Try to construct URL from data-id
+              const nextEpId = nextItem.getAttribute('data-id');
+              if (nextEpId) {
+                this.nextEpisodeUrl = `${window.location.pathname}?ep=${nextEpId}`;
+              }
+            }
+
+            console.log('[9Anime AutoPlay] ✅ Next episode URL:', this.nextEpisodeUrl);
+            return;
+          } else {
+            console.log('[9Anime AutoPlay] This is the last episode');
+            this.nextEpisodeUrl = null;
+            return;
+          }
+        }
+      }
+    }
+
+    // Method 2: Find Next button and extract URL
+    this.findNextButton();
+  }
+
+  findNextButton() {
+    console.log('[9Anime AutoPlay] Looking for Next button...');
+
+    const allLinks = Array.from(document.querySelectorAll('a, button'));
+    const nextButton = allLinks.find(el => {
+      const text = el.textContent.trim().toLowerCase();
+      return text === 'next' || text === 'next episode' || text.includes('next ep');
+    });
+
+    if (nextButton) {
+      console.log('[9Anime AutoPlay] ✅ Found Next button');
+
+      if (nextButton.href && !nextButton.href.includes('javascript:')) {
+        this.nextEpisodeUrl = nextButton.href;
+        console.log('[9Anime AutoPlay] Next URL from button:', this.nextEpisodeUrl);
+      } else {
+        // Button uses JavaScript, we'll just click it later
+        this.nextButton = nextButton;
+        console.log('[9Anime AutoPlay] Next button uses JavaScript handler');
+      }
+    } else {
+      console.log('[9Anime AutoPlay] ⚠️ No Next button found');
+    }
+  }
+
+  setupFullscreenTrigger() {
+    // Wait for any user interaction, then request fullscreen
+    const triggerFullscreen = () => {
+      console.log('[9Anime AutoPlay] User interaction detected, requesting fullscreen...');
+
+      document.documentElement.requestFullscreen().then(() => {
+        console.log('[9Anime AutoPlay] ✅ Fullscreen activated');
+      }).catch(err => {
+        console.log('[9Anime AutoPlay] Fullscreen failed:', err.message);
+      });
+    };
+
+    // Listen for first click or key press
+    ['click', 'keydown'].forEach(event => {
+      document.addEventListener(event, triggerFullscreen, { once: true });
+    });
+
+    // Also try after 3 seconds (in case page auto-interacts)
+    setTimeout(() => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    }, 3000);
+  }
+
+  setupAutoAdvance() {
+    console.log('[9Anime AutoPlay] Setting up auto-advance...');
+
+    // Try to detect video duration
+    const video = document.querySelector('video') || this.findVideoInIframes();
+
+    if (video) {
+      console.log('[9Anime AutoPlay] Video found, will advance when near end');
+
+      video.addEventListener('timeupdate', () => {
+        if (video.duration - video.currentTime < 30) { // 30 seconds before end
+          if (!this.autoPlayTimer) {
+            console.log('[9Anime AutoPlay] Video ending soon, will advance in 30s...');
+            this.autoPlayTimer = setTimeout(() => this.goToNextEpisode(), 30000);
+          }
+        }
+      });
+
+      video.addEventListener('ended', () => {
+        console.log('[9Anime AutoPlay] Video ended');
+        this.goToNextEpisode();
+      });
+    } else {
+      // Fallback: Use fixed timer (e.g., 24 minutes for typical anime episode)
+      console.log('[9Anime AutoPlay] No video found, using 20-minute timer');
+      this.autoPlayTimer = setTimeout(() => this.goToNextEpisode(), 20 * 60 * 1000); // 20 minutes
+    }
+  }
+
+  findVideoInIframes() {
+    const iframes = document.querySelectorAll('iframe');
+    for (const iframe of iframes) {
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const video = iframeDoc?.querySelector('video');
+        if (video) return video;
+      } catch (e) {
+        // Cross-origin
+      }
+    }
+    return null;
+  }
+
+  goToNextEpisode() {
+    console.log('[9Anime AutoPlay] Advancing to next episode...');
+
+    // Clear any existing timers
+    if (this.autoPlayTimer) {
+      clearTimeout(this.autoPlayTimer);
+      this.autoPlayTimer = null;
+    }
+
+    if (this.nextEpisodeUrl) {
+      console.log('[9Anime AutoPlay] ✅ Navigating to:', this.nextEpisodeUrl);
+      window.location.href = this.nextEpisodeUrl;
+    } else if (this.nextButton) {
+      console.log('[9Anime AutoPlay] ✅ Clicking Next button');
+      this.nextButton.click();
+    } else {
+      console.log('[9Anime AutoPlay] ⚠️ No next episode available');
+      this.showNotification('Series ended - no more episodes');
+    }
+  }
+
+  showNotification(message) {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #667eea;
+      color: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 999999;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 5000);
+  }
+}
+
+// Initialize when on watch page
+if (window.location.pathname.includes('/watch/')) {
+  new SimpleAnimePlayer();
+} else {
+  console.log('[9Anime AutoPlay] Not on watch page, skipping');
+}
